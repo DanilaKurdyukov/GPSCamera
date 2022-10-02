@@ -5,14 +5,20 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.SurfaceTexture;
+import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
+import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Button;
 import android.widget.Toast;
+
+import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -59,22 +65,51 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             cameraDevice = camera;
-            createCameraPreview();
+            try {
+                createCameraPreview();
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
         public void onDisconnected(@NonNull CameraDevice camera) {
-
+            cameraDevice.close();
         }
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
-
+            cameraDevice.close();
+            cameraDevice =null;
         }
+    };
+
+    private void createCameraPreview() throws CameraAccessException {
+        SurfaceTexture surfaceTexture = previewForm.getSurfaceTexture();
+        Surface surface = new Surface(surfaceTexture);
+        builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+        builder.addTarget(surface);
+        cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
+            @Override
+            public void onConfigured(@NonNull CameraCaptureSession session) {
+                if (cameraDevice==null) return;
+                cameraCaptureSession = session;
+                builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                try {
+                    cameraCaptureSession.setRepeatingRequest(builder.build(),null,null);
+                } catch (CameraAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                Toast.makeText(getApplicationContext(), "Something went wrong...", Toast.LENGTH_SHORT).show();
+            }
+        },null);
     }
 
-    private void createCameraPreview() {
-    }
+    
 
 
     private void finishCamera(){
