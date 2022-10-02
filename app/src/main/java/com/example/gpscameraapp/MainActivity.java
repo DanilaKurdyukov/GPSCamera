@@ -4,6 +4,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -13,6 +15,7 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Button;
@@ -52,10 +55,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         if (hasFeatureCamera()){
-            if (isPermissionGranted()){
-
+            if (!isPermissionGranted()){
+                requestPermissions(new String[] {Manifest.permission.CAMERA},PERMISSIONS_REQUEST_CODE);
             }
-            else requestPermissions(new String[] {Manifest.permission.CAMERA},PERMISSIONS_REQUEST_CODE);
         }
         else Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
     }
@@ -86,6 +88,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void createCameraPreview() throws CameraAccessException {
         SurfaceTexture surfaceTexture = previewForm.getSurfaceTexture();
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        surfaceTexture.setDefaultBufferSize(metrics.widthPixels*2,metrics.heightPixels*2);
         Surface surface = new Surface(surfaceTexture);
         builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
         builder.addTarget(surface);
@@ -129,12 +134,34 @@ public class MainActivity extends AppCompatActivity {
         public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
 
         }
-    }
+    };
 
+    @SuppressLint("MissingPermission")
     private void startCamera(String cameraLensFacing) {
-        
+        cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try {
+            cameraManager.openCamera(cameraLensFacing,stateCallback,null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isPermissionGranted()){
+            if (previewForm.isAvailable()){
+                startCamera(cameraLensFacing);
+            }
+            else previewForm.setSurfaceTextureListener(surfaceTextureListener);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        finishCamera();
+    }
 
     private void finishCamera(){
         cameraDevice.close();
