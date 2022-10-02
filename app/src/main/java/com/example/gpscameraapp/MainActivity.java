@@ -109,7 +109,31 @@ public class MainActivity extends AppCompatActivity {
         },null);
     }
 
-    
+    TextureView.SurfaceTextureListener surfaceTextureListener = new TextureView.SurfaceTextureListener() {
+        @Override
+        public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
+            startCamera(cameraLensFacing);
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
+
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+            return false;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
+
+        }
+    }
+
+    private void startCamera(String cameraLensFacing) {
+        
+    }
 
 
     private void finishCamera(){
@@ -123,5 +147,17 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isPermissionGranted(){
         return checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED ? true : false;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode==PERMISSIONS_REQUEST_CODE){
+            if (grantResults!=null){
+                if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                    startCamera(cameraLensFacing);
+                }
+            }
+        }
     }
 }
