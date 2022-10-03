@@ -2,11 +2,16 @@ package com.example.gpscameraapp;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.ImageFormat;
+import android.graphics.Point;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -16,8 +21,10 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.VolumeShaper;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
@@ -36,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
 
     CameraManager cameraManager;
 
-    private TextureView previewForm;
+    private AutoFitTextureView previewForm;
     private Button btnTakePicture;
 
     private String cameraLensFacing = "0";
@@ -49,6 +56,12 @@ public class MainActivity extends AppCompatActivity {
 
     private Size previewSize;
     private Size[] imageDimension;
+
+    private int mSensorOrientation;
+
+    private static final int MAX_PREVIEW_WIDTH = 1920;
+
+    private static final int MAX_PREVIEW_HEIGHT = 1080;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,14 +100,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void createCameraPreview() throws CameraAccessException {
         SurfaceTexture surfaceTexture = previewForm.getSurfaceTexture();
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        int screenWidth = metrics.widthPixels;
-        int screenHeight = metrics.heightPixels / 2;
-        Size sizeFinish = chooseOptimalSize(imageDimension, screenWidth, screenHeight);
-        int cameraSizeW = sizeFinish.getWidth();
-        int cameraSizeH = sizeFinish.getHeight();
-        surfaceTexture.setDefaultBufferSize(cameraSizeW, cameraSizeH);
+
+        surfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
         Surface surface = new Surface(surfaceTexture);
         builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
         builder.addTarget(surface);
@@ -121,7 +128,7 @@ public class MainActivity extends AppCompatActivity {
     TextureView.SurfaceTextureListener surfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-            startCamera(cameraLensFacing);
+            startCamera(cameraLensFacing,width, height);
         }
 
         @Override
@@ -141,17 +148,16 @@ public class MainActivity extends AppCompatActivity {
     };
 
     @SuppressLint("MissingPermission")
-    private void startCamera(String cameraLensFacing) {
+    private void startCamera(String cameraLensFacing,int width,int height) {
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraLensFacing);
-            StreamConfigurationMap map =characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            imageDimension = map.getOutputSizes(SurfaceTexture.class);
+            setUpCameraOutputs(width,height);
             cameraManager.openCamera(cameraLensFacing,stateCallback,null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
     }
+
 
     @Override
     protected void onResume() {
@@ -162,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
             }
             else{
                 if (previewForm.isAvailable()){
-                    startCamera(cameraLensFacing);
+                    startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
                 }
                 else previewForm.setSurfaceTextureListener(surfaceTextureListener);
             }
@@ -177,39 +183,117 @@ public class MainActivity extends AppCompatActivity {
         finishCamera();
     }
 
+    private void setUpCameraOutputs(int width, int height){
+        cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try {
+            for(String id : cameraManager.getCameraIdList()){
+                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(id);
+                Integer facing  = characteristics.get(CameraCharacteristics.LENS_FACING);
+                if (facing!=null&&facing==CameraCharacteristics.LENS_FACING_FRONT) continue;
+                StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                if (map ==null) continue;
+                Size largest = Collections.max(
+                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                        new CompareSizesByArea()
+                );
+                int displayRotation = getWindowManager().getDefaultDisplay().getRotation();
+                mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                boolean swappedDimensions = false;
+                switch (displayRotation){
+                    case Surface.ROTATION_0:
+                    case Surface.ROTATION_180:
+                        if (mSensorOrientation == 90 || mSensorOrientation == 270){
+                            swappedDimensions = true;
+                        }
+                        break;
+                    case Surface.ROTATION_90:
+                    case Surface.ROTATION_270:
+                        if (mSensorOrientation == 0 || mSensorOrientation == 180){
+                            swappedDimensions=true;
+                        }
+                        break;
+                    default:
+                        Log.e("TAG","Display rotation is invalid: " + displayRotation);
+                }
+                Point displaySize = new Point();
+                getWindowManager().getDefaultDisplay().getSize(displaySize);
+                int rotatedPreviewWidth = width;
+                int rotatedPreviewHeight = height;
+                int maxPreviewWidth = displaySize.x;
+                int maxPreviewHeight = displaySize.y;
+                if (swappedDimensions){
+                    rotatedPreviewWidth=height;
+                    rotatedPreviewHeight = width;
+                    maxPreviewWidth = displaySize.y;
+                    maxPreviewHeight = displaySize.x;
+                }
 
-    private Size chooseOptimalSize(Size[] sizes, int w, int h){
-        final double ASPECT_TOLERANCE = 1;
-        double targetRatio = (double) h / w;
+                if (maxPreviewWidth>MAX_PREVIEW_WIDTH){
+                    maxPreviewWidth = MAX_PREVIEW_WIDTH;
+                }
 
-        if (sizes == null) return null;
-        Size optimalSize = null;
+                if (maxPreviewHeight > MAX_PREVIEW_HEIGHT){
+                    maxPreviewHeight = MAX_PREVIEW_HEIGHT;
+                }
 
-        double minDiff = Double.MAX_VALUE;
-
-        int targetHeight = h;
-
-        for (Size size : sizes) {
-            double ratio = (double) size.getWidth() / size.getHeight();
-            if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE) continue;
-            if (Math.abs(size.getHeight() - targetHeight) < minDiff) {
-                optimalSize = size;
-                minDiff = Math.abs(size.getHeight() - targetHeight);
+                previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),rotatedPreviewWidth,
+                        rotatedPreviewHeight,maxPreviewWidth,maxPreviewHeight,largest);
+                int orientation = getResources().getConfiguration().orientation;
+                if (orientation == Configuration.ORIENTATION_LANDSCAPE){
+                    previewForm.setAspectRatio(previewSize.getWidth(),previewSize.getHeight());
+                } else{
+                    previewForm.setAspectRatio(previewSize.getHeight(),previewSize.getWidth());
+                }
+                cameraLensFacing = id;
             }
         }
+        catch (Exception e){
+            e.getMessage();
+        }
+    }
 
-        if (optimalSize == null) {
-            minDiff = Double.MAX_VALUE;
-            for (Size size : sizes) {
-                if (Math.abs(size.getHeight() - targetHeight) < minDiff) {
-                    optimalSize = size;
-                    minDiff = Math.abs(size.getHeight() - targetHeight);
+    private Size chooseOptimalSize(Size[] choices, int textureViewWidth,
+                                   int textureViewHeight, int maxWidth,
+                                   int maxHeight, Size aspectRatio){
+        List<Size> bigEnough = new ArrayList<>();
+        // Collect the supported resolutions that are smaller than the preview Surface
+        List<Size> notBigEnough = new ArrayList<>();
+        int w = aspectRatio.getWidth();
+        int h = aspectRatio.getHeight();
+        for (Size option : choices) {
+            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
+                    option.getHeight() == option.getWidth() * h / w) {
+                if (option.getWidth() >= textureViewWidth &&
+                        option.getHeight() >= textureViewHeight) {
+                    bigEnough.add(option);
+                } else {
+                    notBigEnough.add(option);
                 }
             }
         }
-        return optimalSize;
+
+        // Pick the smallest of those big enough. If there is no one big enough, pick the
+        // largest of those not big enough.
+        if (bigEnough.size() > 0) {
+            return Collections.min(bigEnough, new CompareSizesByArea());
+        } else if (notBigEnough.size() > 0) {
+            return Collections.max(notBigEnough, new CompareSizesByArea());
+        } else {
+            Log.e("TAG", "Couldn't find any suitable preview size");
+            return choices[0];
+        }
     }
 
+    static class CompareSizesByArea implements Comparator<Size> {
+
+        @Override
+        public int compare(Size lhs, Size rhs) {
+            // We cast here to ensure the multiplications won't overflow
+            return Long.signum((long) lhs.getWidth() * lhs.getHeight() -
+                    (long) rhs.getWidth() * rhs.getHeight());
+        }
+
+    }
 
     private void finishCamera(){
         cameraDevice.close();
@@ -230,7 +314,7 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode==PERMISSIONS_REQUEST_CODE){
             if (grantResults!=null){
                 if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
-                    startCamera(cameraLensFacing);
+                    startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
                 }
             }
         }

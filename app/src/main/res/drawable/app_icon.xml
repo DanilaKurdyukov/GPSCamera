@@ -10,8 +10,8 @@
     </item>
     <item
         android:drawable="@drawable/ic_baseline_camera_alt_24"
-        android:top="@dimen/vertical_margin"
-        android:bottom="@dimen/vertical_margin"
-        android:right="@dimen/horizontal_margin"
-        android:left="@dimen/horizontal_margin"/>
+        android:top="@dimen/vertical_app_icon"
+        android:bottom="@dimen/vertical_app_icon"
+        android:right="@dimen/horizontal_app_icon"
+        android:left="@dimen/horizontal_app_icon"/>
 </layer-list>
