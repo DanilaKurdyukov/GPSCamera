@@ -51,16 +51,7 @@ public class MainActivity extends AppCompatActivity {
         btnTakePicture = findViewById(R.id.button_take_picture);
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        if (hasFeatureCamera()){
-            if (!isPermissionGranted()){
-                requestPermissions(new String[] {Manifest.permission.CAMERA},PERMISSIONS_REQUEST_CODE);
-            }
-        }
-        else Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
-    }
+
 
 
     CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
@@ -149,12 +140,19 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (isPermissionGranted()){
-            if (previewForm.isAvailable()){
-                startCamera(cameraLensFacing);
+        if (hasFeatureCamera()){
+            if (!isPermissionGranted()){
+                requestPermissions(new String[] {Manifest.permission.CAMERA},PERMISSIONS_REQUEST_CODE);
             }
-            else previewForm.setSurfaceTextureListener(surfaceTextureListener);
+            else{
+                if (previewForm.isAvailable()){
+                    startCamera(cameraLensFacing);
+                }
+                else previewForm.setSurfaceTextureListener(surfaceTextureListener);
+            }
         }
+        else Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
+
     }
 
     @Override
