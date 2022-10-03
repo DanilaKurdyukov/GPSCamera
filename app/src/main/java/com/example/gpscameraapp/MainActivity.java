@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -110,7 +111,22 @@ public class MainActivity extends AppCompatActivity {
             public void onConfigured(@NonNull CameraCaptureSession session) {
                 if (cameraDevice==null) return;
                 cameraCaptureSession = session;
-                builder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                CameraCharacteristics characteristics = null;
+                try {
+                    characteristics = cameraManager.getCameraCharacteristics(cameraLensFacing);
+                } catch (CameraAccessException e) {
+                    e.printStackTrace();
+                }
+                int[] capabilities = characteristics
+                        .get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+
+                boolean isManualFocusSupported = IntStream.of(capabilities)
+                        .anyMatch(x -> x == CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR);
+
+                if (isManualFocusSupported) {
+                    builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF);
+                    builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0f);
+                }
                 try {
                     cameraCaptureSession.setRepeatingRequest(builder.build(),null,null);
                 } catch (CameraAccessException e) {
@@ -244,7 +260,6 @@ public class MainActivity extends AppCompatActivity {
                 } else{
                     previewForm.setAspectRatio(previewSize.getHeight(),previewSize.getWidth());
                 }
-                cameraLensFacing = id;
             }
         }
         catch (Exception e){
@@ -271,7 +286,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-
         // Pick the smallest of those big enough. If there is no one big enough, pick the
         // largest of those not big enough.
         if (bigEnough.size() > 0) {
