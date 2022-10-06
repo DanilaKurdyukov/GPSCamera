@@ -41,7 +41,10 @@ import java.util.stream.IntStream;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final int PERMISSIONS_REQUEST_CODE = 100;
+
+    public static final int CAMERA_PERMISSION_REQUEST_CODE = 01;
+
+    public static final int STORAGE_PERMISSION_REQUEST_CODE = 02;
 
     CameraManager cameraManager;
 
@@ -57,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
     private CaptureRequest.Builder builder;
 
     private Size previewSize;
-    private Size[] imageDimension;
 
     private int mSensorOrientation;
 
@@ -73,11 +75,44 @@ public class MainActivity extends AppCompatActivity {
         btnTakePicture = findViewById(R.id.button_take_picture);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        hideStatusBar();
+        if (hasFeatureCamera()){
+            if (!isCameraPermissionGranted()){
+                requestPermissions(new String[] {Manifest.permission.CAMERA},CAMERA_PERMISSION_REQUEST_CODE);
+            }
+            else{
+                if (previewForm.isAvailable()){
+                    startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
+                }
+                else previewForm.setSurfaceTextureListener(surfaceTextureListener);
+            }
+        }
+        else Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
 
-    private void hideStatusBar(){
-        View decorView = getWindow().getDecorView();
-        int uiOptions = View.SYSTEM_UI_FLAG_FULLSCREEN;
-        decorView.setSystemUiVisibility(uiOptions);
+        btnTakePicture.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!isStoragePermissionGranted()){
+                    requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},STORAGE_PERMISSION_REQUEST_CODE);
+                }
+                else{
+                    makePhoto();
+                }
+            }
+        });
+    }
+
+    private void makePhoto() {
+        
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        finishCamera();
     }
 
     CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
@@ -178,31 +213,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        hideStatusBar();
-        if (hasFeatureCamera()){
-            if (!isPermissionGranted()){
-                requestPermissions(new String[] {Manifest.permission.CAMERA},PERMISSIONS_REQUEST_CODE);
-            }
-            else{
-                if (previewForm.isAvailable()){
-                    startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
-                }
-                else previewForm.setSurfaceTextureListener(surfaceTextureListener);
-            }
-        }
-        else Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
-
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        finishCamera();
-    }
 
     private void setUpCameraOutputs(int width, int height){
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
@@ -323,19 +333,33 @@ public class MainActivity extends AppCompatActivity {
         return getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA) ? true : false;
     }
 
-    private boolean isPermissionGranted(){
+    private boolean isCameraPermissionGranted(){
         return checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED ? true : false;
+    }
+
+    private boolean isStoragePermissionGranted(){
+        return checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ? true : false;
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode==PERMISSIONS_REQUEST_CODE){
+        if (requestCode==CAMERA_PERMISSION_REQUEST_CODE){
             if (grantResults!=null){
                 if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
                     startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
                 }
             }
         }
+        else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE){
+            if (grantResults!=null){
+
+            }
+        }
+    }
+    private void hideStatusBar(){
+        View decorView = getWindow().getDecorView();
+        int uiOptions = View.SYSTEM_UI_FLAG_FULLSCREEN;
+        decorView.setSystemUiVisibility(uiOptions);
     }
 }
