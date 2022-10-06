@@ -10,6 +10,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
@@ -23,6 +24,7 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.VolumeShaper;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Size;
@@ -32,11 +34,17 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.IntStream;
 
 public class MainActivity extends AppCompatActivity {
@@ -66,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_PREVIEW_WIDTH = 1920;
 
     private static final int MAX_PREVIEW_HEIGHT = 1080;
+
+    File galleryFolder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,15 +109,44 @@ public class MainActivity extends AppCompatActivity {
                     requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},STORAGE_PERMISSION_REQUEST_CODE);
                 }
                 else{
-                    makePhoto();
+                    FileOutputStream outputPhoto = null;
+                    try {
+                        outputPhoto = new FileOutputStream(createImageFile(galleryFolder));
+                        previewForm.getBitmap().compress(Bitmap.CompressFormat.PNG,100,outputPhoto);
+                        outputPhoto.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally{
+                        if (outputPhoto!=null){
+                            try {
+                                outputPhoto.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
                 }
             }
         });
     }
 
-    private void makePhoto() {
-        
+    private void createImageGallery() {
+        File storageDirectory = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        galleryFolder = new File(storageDirectory,getResources().getString(R.string.app_name));
+        if (!galleryFolder.exists()){
+            boolean wasCreated = galleryFolder.mkdirs();
+            if (!wasCreated){
+                Toast.makeText(getApplicationContext(), "Failed to create directory.", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
+
+    private File createImageFile(File galleryFolder) throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String imageFileName = "image_" + timeStamp + "_";
+        return File.createTempFile(imageFileName,".jpg",galleryFolder);
+    }
+
 
     @Override
     protected void onPause() {
@@ -353,7 +392,9 @@ public class MainActivity extends AppCompatActivity {
         }
         else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE){
             if (grantResults!=null){
-
+                if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                    createImageGallery();
+                }
             }
         }
     }
