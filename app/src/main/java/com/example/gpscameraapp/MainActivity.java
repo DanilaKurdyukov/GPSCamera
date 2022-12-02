@@ -2,6 +2,7 @@ package com.example.gpscameraapp;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -21,6 +22,9 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -48,7 +52,7 @@ import java.util.stream.IntStream;
 public class MainActivity extends AppCompatActivity {
 
 
-    public static final int CAMERA_PERMISSION_REQUEST_CODE = 01;
+    public static final int CAMERA_AND_LOCATION_PERMISSION_REQUEST_CODE = 01;
 
     public static final int STORAGE_PERMISSION_REQUEST_CODE = 02;
 
@@ -89,37 +93,30 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         hideStatusBar();
-        if (hasFeatureCamera()){
-            if (!isCameraPermissionGranted()){
-                requestPermissions(new String[] {Manifest.permission.CAMERA},CAMERA_PERMISSION_REQUEST_CODE);
+        if (hasFeatureCamera()) {
+            if (!isCameraAndLocationPermissionsGranted()) {
+                requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION}, CAMERA_AND_LOCATION_PERMISSION_REQUEST_CODE);
+            } else {
+                getUserLocation();
+                if (previewForm.isAvailable()) {
+                    startCamera(cameraLensFacing, previewForm.getWidth(), previewForm.getHeight());
+                } else previewForm.setSurfaceTextureListener(surfaceTextureListener);
             }
-            else{
-                if (previewForm.isAvailable()){
-                    startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
-                }
-                else previewForm.setSurfaceTextureListener(surfaceTextureListener);
-            }
-        }
-        else Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
+        } else
+            Toast.makeText(getApplicationContext(), "Sorry, Camera feature is necessary!", Toast.LENGTH_SHORT).show();
 
         btnTakePicture.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!isStoragePermissionGranted()){
-                    requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},STORAGE_PERMISSION_REQUEST_CODE);
-                }
-                else{
-                    pictureThread = new PictureThread(getApplicationContext(),previewForm);
+                if (!isStoragePermissionGranted()) {
+                    requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE_PERMISSION_REQUEST_CODE);
+                } else {
+                    pictureThread = new PictureThread(getApplicationContext(), previewForm);
                     pictureThread.start();
                 }
             }
         });
     }
-
-
-
-
-
 
     @Override
     protected void onPause() {
@@ -146,7 +143,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
             cameraDevice.close();
-            cameraDevice =null;
+            cameraDevice = null;
         }
     };
 
@@ -160,7 +157,7 @@ public class MainActivity extends AppCompatActivity {
         cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
             @Override
             public void onConfigured(@NonNull CameraCaptureSession session) {
-                if (cameraDevice==null) return;
+                if (cameraDevice == null) return;
                 cameraCaptureSession = session;
                 CameraCharacteristics characteristics = null;
                 try {
@@ -179,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
                     builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0f);
                 }
                 try {
-                    cameraCaptureSession.setRepeatingRequest(builder.build(),null,null);
+                    cameraCaptureSession.setRepeatingRequest(builder.build(), null, null);
                 } catch (CameraAccessException e) {
                     e.printStackTrace();
                 }
@@ -189,13 +186,13 @@ public class MainActivity extends AppCompatActivity {
             public void onConfigureFailed(@NonNull CameraCaptureSession session) {
                 Toast.makeText(getApplicationContext(), "Something went wrong...", Toast.LENGTH_SHORT).show();
             }
-        },null);
+        }, null);
     }
 
     TextureView.SurfaceTextureListener surfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-            startCamera(cameraLensFacing,width, height);
+            startCamera(cameraLensFacing, width, height);
         }
 
         @Override
@@ -215,26 +212,26 @@ public class MainActivity extends AppCompatActivity {
     };
 
     @SuppressLint("MissingPermission")
-    private void startCamera(String cameraLensFacing,int width,int height) {
+    private void startCamera(String cameraLensFacing, int width, int height) {
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            setUpCameraOutputs(width,height);
-            cameraManager.openCamera(cameraLensFacing,stateCallback,null);
+            setUpCameraOutputs(width, height);
+            cameraManager.openCamera(cameraLensFacing, stateCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
     }
 
 
-    private void setUpCameraOutputs(int width, int height){
+    private void setUpCameraOutputs(int width, int height) {
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            for(String id : cameraManager.getCameraIdList()){
+            for (String id : cameraManager.getCameraIdList()) {
                 CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(id);
-                Integer facing  = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing!=null&&facing==CameraCharacteristics.LENS_FACING_FRONT) continue;
+                Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) continue;
                 StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                if (map ==null) continue;
+                if (map == null) continue;
                 Size largest = Collections.max(
                         Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea()
@@ -242,21 +239,21 @@ public class MainActivity extends AppCompatActivity {
                 int displayRotation = getWindowManager().getDefaultDisplay().getRotation();
                 mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
                 boolean swappedDimensions = false;
-                switch (displayRotation){
+                switch (displayRotation) {
                     case Surface.ROTATION_0:
                     case Surface.ROTATION_180:
-                        if (mSensorOrientation == 90 || mSensorOrientation == 270){
+                        if (mSensorOrientation == 90 || mSensorOrientation == 270) {
                             swappedDimensions = true;
                         }
                         break;
                     case Surface.ROTATION_90:
                     case Surface.ROTATION_270:
-                        if (mSensorOrientation == 0 || mSensorOrientation == 180){
-                            swappedDimensions=true;
+                        if (mSensorOrientation == 0 || mSensorOrientation == 180) {
+                            swappedDimensions = true;
                         }
                         break;
                     default:
-                        Log.e("TAG","Display rotation is invalid: " + displayRotation);
+                        Log.e("TAG", "Display rotation is invalid: " + displayRotation);
                 }
                 Point displaySize = new Point();
                 getWindowManager().getDefaultDisplay().getSize(displaySize);
@@ -264,39 +261,38 @@ public class MainActivity extends AppCompatActivity {
                 int rotatedPreviewHeight = height;
                 int maxPreviewWidth = displaySize.x;
                 int maxPreviewHeight = displaySize.y;
-                if (swappedDimensions){
-                    rotatedPreviewWidth=height;
+                if (swappedDimensions) {
+                    rotatedPreviewWidth = height;
                     rotatedPreviewHeight = width;
                     maxPreviewWidth = displaySize.y;
                     maxPreviewHeight = displaySize.x;
                 }
 
-                if (maxPreviewWidth>MAX_PREVIEW_WIDTH){
+                if (maxPreviewWidth > MAX_PREVIEW_WIDTH) {
                     maxPreviewWidth = MAX_PREVIEW_WIDTH;
                 }
 
-                if (maxPreviewHeight > MAX_PREVIEW_HEIGHT){
+                if (maxPreviewHeight > MAX_PREVIEW_HEIGHT) {
                     maxPreviewHeight = MAX_PREVIEW_HEIGHT;
                 }
 
-                previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),rotatedPreviewWidth,
-                        rotatedPreviewHeight,maxPreviewWidth,maxPreviewHeight,largest);
+                previewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class), rotatedPreviewWidth,
+                        rotatedPreviewHeight, maxPreviewWidth, maxPreviewHeight, largest);
                 int orientation = getResources().getConfiguration().orientation;
-                if (orientation == Configuration.ORIENTATION_LANDSCAPE){
-                    previewForm.setAspectRatio(previewSize.getWidth(),previewSize.getHeight());
-                } else{
-                    previewForm.setAspectRatio(previewSize.getHeight(),previewSize.getWidth());
+                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    previewForm.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+                } else {
+                    previewForm.setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
                 }
             }
-        }
-        catch (Exception e){
+        } catch (Exception e) {
             e.getMessage();
         }
     }
 
     private Size chooseOptimalSize(Size[] choices, int textureViewWidth,
                                    int textureViewHeight, int maxWidth,
-                                   int maxHeight, Size aspectRatio){
+                                   int maxHeight, Size aspectRatio) {
         List<Size> bigEnough = new ArrayList<>();
         // Collect the supported resolutions that are smaller than the preview Surface
         List<Size> notBigEnough = new ArrayList<>();
@@ -336,32 +332,56 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void finishCamera(){
+    private void finishCamera() {
         cameraDevice.close();
         cameraDevice = null;
     }
 
-    private boolean hasFeatureCamera(){
+    private boolean hasFeatureCamera() {
         return getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA) ? true : false;
     }
 
-    private boolean isCameraPermissionGranted(){
-        return checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED ? true : false;
+    private boolean isCameraAndLocationPermissionsGranted() {
+        return checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
+                checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ? true : false;
     }
 
-    private boolean isStoragePermissionGranted(){
+    private boolean isStoragePermissionGranted() {
         return checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ? true : false;
     }
 
-
+    private void getUserLocation() {
+        LocationManager locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        LocationListener locListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(@NonNull Location location) {
+                Toast.makeText(
+                        getBaseContext(),
+                        "Location changed: Lat: " + location.getLatitude() + " Lng: "
+                                + location.getLongitude(), Toast.LENGTH_SHORT).show();
+            }
+        };
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        locManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 10, locListener);
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode==CAMERA_PERMISSION_REQUEST_CODE){
+        if (requestCode==CAMERA_AND_LOCATION_PERMISSION_REQUEST_CODE){
             if (grantResults!=null){
                 if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
                     startCamera(cameraLensFacing,previewForm.getWidth(),previewForm.getHeight());
+                    getUserLocation();
                 }
             }
         }
