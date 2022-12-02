@@ -36,6 +36,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.google.android.material.textview.MaterialTextView;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -81,12 +83,17 @@ public class MainActivity extends AppCompatActivity {
 
     PictureThread pictureThread;
 
+    MaterialTextView txtLatitude;
+    MaterialTextView txtLongitude;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         previewForm = findViewById(R.id.textureView);
         btnTakePicture = findViewById(R.id.button_take_picture);
+        txtLatitude = findViewById(R.id.text_view_latitude);
+        txtLongitude = findViewById(R.id.text_view_longitude);
     }
 
     @Override
@@ -355,10 +362,10 @@ public class MainActivity extends AppCompatActivity {
         LocationListener locListener = new LocationListener() {
             @Override
             public void onLocationChanged(@NonNull Location location) {
-                Toast.makeText(
-                        getBaseContext(),
-                        "Location changed: Lat: " + location.getLatitude() + " Lng: "
-                                + location.getLongitude(), Toast.LENGTH_SHORT).show();
+                double latitude = location.getLatitude();
+                double longitude = location.getLongitude();
+                txtLatitude.setText("Широта: " + Math.round(latitude *100000.0) / 100000.0);
+                txtLongitude.setText("Долгота: " + Math.round(longitude*100000.0) / 100000.0);
             }
         };
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -371,7 +378,7 @@ public class MainActivity extends AppCompatActivity {
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        locManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 10, locListener);
+        locManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 5, locListener);
     }
 
     @Override
