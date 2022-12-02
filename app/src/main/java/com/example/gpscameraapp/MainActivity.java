@@ -6,8 +6,11 @@ import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -28,6 +31,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
@@ -359,27 +363,43 @@ public class MainActivity extends AppCompatActivity {
 
     private void getUserLocation() {
         LocationManager locManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        LocationListener locListener = new LocationListener() {
-            @Override
-            public void onLocationChanged(@NonNull Location location) {
-                double latitude = location.getLatitude();
-                double longitude = location.getLongitude();
-                txtLatitude.setText("Широта: " + Math.round(latitude *100000.0) / 100000.0);
-                txtLongitude.setText("Долгота: " + Math.round(longitude*100000.0) / 100000.0);
+        if (!locManager.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+            new AlertDialog.Builder(MainActivity.this)
+                    .setMessage("Для работы приложения необходима служба геолокации, включить её?")
+                    .setPositiveButton("Да", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            MainActivity.this.startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                        }
+                    })
+                    .setNegativeButton("Нет", null)
+                    .show();
+        } else{
+            LocationListener locListener = new LocationListener() {
+                @Override
+                public void onLocationChanged(@NonNull Location location) {
+                    double latitude = location.getLatitude();
+                    double longitude = location.getLongitude();
+                    txtLatitude.setText("Широта: " + Math.round(latitude *100000.0) / 100000.0);
+                    txtLongitude.setText("Долгота: " + Math.round(longitude*100000.0) / 100000.0);
+                }
+            };
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
             }
-        };
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            return;
+            locManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 5, locListener);
         }
-        locManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 5, locListener);
+
     }
+
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
