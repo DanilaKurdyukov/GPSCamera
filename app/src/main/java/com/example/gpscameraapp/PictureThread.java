@@ -5,6 +5,11 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -26,16 +31,20 @@ public class PictureThread extends Thread{
     Context context;
     TextureView previewForm;
     Uri images;
-    public PictureThread(Context context,TextureView previewForm) {
+    double latitude, longitude;
+
+    public PictureThread(Context context, TextureView previewForm, double latitude, double longitude) {
         this.context = context;
         this.previewForm = previewForm;
+        this.latitude = latitude;
+        this.longitude = longitude;
     }
 
     @Override
     public void run() {
         super.run();
         try {
-            saveImage(previewForm.getBitmap(),"asdasdsa");
+            saveImage(editImage(previewForm.getBitmap(),String.valueOf(latitude),String.valueOf(longitude)),"asdasdsa");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -82,6 +91,35 @@ public class PictureThread extends Thread{
                 Toast.makeText(context, "Failed to create directory.", Toast.LENGTH_SHORT).show();
             }
         }
+    }
+
+    private Bitmap editImage(Bitmap image,String latitude,String longitude){
+        Typeface tf = Typeface.create("Helvetica",Typeface.BOLD);
+
+        Paint paint = new Paint();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        paint.setTypeface(tf);
+        paint.setTextAlign(Paint.Align.LEFT);
+        paint.setTextSize(80);
+
+        Rect textRect = new Rect();
+        paint.getTextBounds(latitude,0,latitude.length(),textRect);
+
+        Canvas canvas = new Canvas(image);
+
+        canvas.drawText("Latitude: " + latitude,canvas.getWidth() / 9,previewForm.getHeight()-700,paint);
+
+        paint = new Paint();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        paint.setTypeface(tf);
+        paint.setTextAlign(Paint.Align.LEFT);
+        paint.setTextSize(80);
+        paint.getTextBounds(longitude,0,longitude.length(),textRect);
+
+        canvas.drawText("Longitude : " + longitude,canvas.getWidth() / 9,previewForm.getHeight()-500,paint);
+        return image;
     }
 
     private void saveImageToGallery(){

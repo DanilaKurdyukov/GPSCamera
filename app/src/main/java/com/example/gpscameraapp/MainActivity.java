@@ -90,6 +90,8 @@ public class MainActivity extends AppCompatActivity {
     MaterialTextView txtLatitude;
     MaterialTextView txtLongitude;
 
+    double latitude,longitude;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -122,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
                 if (!isStoragePermissionGranted()) {
                     requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE_PERMISSION_REQUEST_CODE);
                 } else {
-                    pictureThread = new PictureThread(getApplicationContext(), previewForm);
+                    pictureThread = new PictureThread(getApplicationContext(), previewForm, latitude,longitude);
                     pictureThread.start();
                 }
             }
@@ -378,10 +380,10 @@ public class MainActivity extends AppCompatActivity {
             LocationListener locListener = new LocationListener() {
                 @Override
                 public void onLocationChanged(@NonNull Location location) {
-                    double latitude = location.getLatitude();
-                    double longitude = location.getLongitude();
-                    txtLatitude.setText("Широта: " + Math.round(latitude *100000.0) / 100000.0);
-                    txtLongitude.setText("Долгота: " + Math.round(longitude*100000.0) / 100000.0);
+                    latitude = Math.round(location.getLatitude() *100000.0) / 100000.0;
+                    longitude = Math.round(location.getLongitude() * 100000.0) / 100000.0;
+                    txtLatitude.setText("Latitude: " + latitude);
+                    txtLongitude.setText("Longitude: " + longitude);
                 }
             };
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -415,7 +417,7 @@ public class MainActivity extends AppCompatActivity {
         else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE){
             if (grantResults!=null){
                 if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
-                    pictureThread = new PictureThread(getApplicationContext(),previewForm);
+                    pictureThread = new PictureThread(getApplicationContext(),previewForm,latitude,longitude);
                     pictureThread.start();
                 }
             }
