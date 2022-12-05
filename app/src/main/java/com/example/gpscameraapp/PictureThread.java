@@ -32,12 +32,14 @@ public class PictureThread extends Thread{
     TextureView previewForm;
     Uri images;
     double latitude, longitude;
+    String city;
 
-    public PictureThread(Context context, TextureView previewForm, double latitude, double longitude) {
+    public PictureThread(Context context, TextureView previewForm, double latitude, double longitude,String city) {
         this.context = context;
         this.previewForm = previewForm;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.city = city;
     }
 
     @Override
@@ -78,6 +80,8 @@ public class PictureThread extends Thread{
         }
 
         saved = bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+        String message = saved ? "Фото сохранено в галерею!" : "Что-то пошло не так...";
+        Toast.makeText(context,message,Toast.LENGTH_SHORT);
         fos.flush();
         fos.close();
     }
@@ -124,8 +128,18 @@ public class PictureThread extends Thread{
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.BLACK);
         paint.setStrokeWidth(0);
-        paint.setAlpha(70);
-        canvas.drawRect(0, 1800, 2000, 1400, paint);
+        paint.setAlpha(80);
+        canvas.drawRect(0, 2000, 2000, 1400, paint);
+
+        paint = new Paint();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        paint.setTypeface(tf);
+        paint.setTextAlign(Paint.Align.LEFT);
+        paint.setTextSize(80);
+        paint.getTextBounds(city,0,city.length(),textRect);
+
+        canvas.drawText(city,canvas.getWidth() / 9,previewForm.getHeight()-300,paint);
 
 
         return image;

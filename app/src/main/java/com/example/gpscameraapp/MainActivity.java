@@ -25,6 +25,8 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -87,8 +89,7 @@ public class MainActivity extends AppCompatActivity {
 
     PictureThread pictureThread;
 
-    MaterialTextView txtLatitude;
-    MaterialTextView txtLongitude;
+    MaterialTextView txtLatitude, txtLongitude, txtCity;
 
     double latitude,longitude;
 
@@ -100,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
         btnTakePicture = findViewById(R.id.button_take_picture);
         txtLatitude = findViewById(R.id.text_view_latitude);
         txtLongitude = findViewById(R.id.text_view_longitude);
+        txtCity = findViewById(R.id.text_view_city);
     }
 
     @Override
@@ -124,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
                 if (!isStoragePermissionGranted()) {
                     requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, STORAGE_PERMISSION_REQUEST_CODE);
                 } else {
-                    pictureThread = new PictureThread(getApplicationContext(), previewForm, latitude,longitude);
+                    pictureThread = new PictureThread(getApplicationContext(), previewForm, latitude,longitude,String.valueOf(txtCity.getText()));
                     pictureThread.start();
                 }
             }
@@ -384,6 +386,18 @@ public class MainActivity extends AppCompatActivity {
                     longitude = Math.round(location.getLongitude() * 100000.0) / 100000.0;
                     txtLatitude.setText("Latitude: " + latitude);
                     txtLongitude.setText("Longitude: " + longitude);
+                    Geocoder gcd = new Geocoder(getBaseContext(), Locale.getDefault());
+                    List<Address> addresses;
+                    try {
+                        addresses = gcd.getFromLocation(latitude,
+                                longitude, 1);
+                        if (addresses.size() > 0) {
+                            txtCity.setText(addresses.get(0).getLocality());
+                        }
+                    }
+                    catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             };
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -417,7 +431,7 @@ public class MainActivity extends AppCompatActivity {
         else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE){
             if (grantResults!=null){
                 if (grantResults[0]==PackageManager.PERMISSION_GRANTED){
-                    pictureThread = new PictureThread(getApplicationContext(),previewForm,latitude,longitude);
+                    pictureThread = new PictureThread(getApplicationContext(),previewForm,latitude,longitude,String.valueOf(txtCity.getText()));
                     pictureThread.start();
                 }
             }
