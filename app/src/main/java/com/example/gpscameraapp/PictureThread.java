@@ -119,6 +119,15 @@ public class PictureThread extends Thread{
         paint.getTextBounds(longitude,0,longitude.length(),textRect);
 
         canvas.drawText("Longitude : " + longitude,canvas.getWidth() / 9,previewForm.getHeight()-500,paint);
+
+        paint = new Paint();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.BLACK);
+        paint.setStrokeWidth(0);
+        paint.setAlpha(70);
+        canvas.drawRect(0, 1800, 2000, 1400, paint);
+
+
         return image;
     }
 
